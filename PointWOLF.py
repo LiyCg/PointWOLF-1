@@ -28,17 +28,25 @@ class PointWOLF(object):
             pos([N,3]) : original pointcloud
             pos_new([N,3]) : Pointcloud augmneted by PointWOLF
         """
+        # number of anchor points
         M=self.num_anchor #(Mx3)
+        
+        # number of pointCloud data points
         N, _=pos.shape #(N)
         
+        # anchor point sampling method
         if self.sample_type == 'random':
             idx = np.random.choice(N,M)#(M)
         elif self.sample_type == 'fps':
             idx = self.fps(pos, M) #(M)
-        
+           
+        # actual anchor points
         pos_anchor = pos[idx] #(M,3), anchor point
         
+        # expand anchor points' dimension to the number of data points
         pos_repeat = np.expand_dims(pos,0).repeat(M, axis=0)#(M,N,3)
+        
+        # initializing pos_normalize
         pos_normalize = np.zeros_like(pos_repeat, dtype=pos.dtype)  #(M,N,3)
         
         #Move to canonical space
