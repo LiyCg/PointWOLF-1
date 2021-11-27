@@ -131,13 +131,21 @@ class PointWOLF(object):
 
         degree = np.pi * np.random.uniform(*self.R_range, size=(M,3)) / 180.0 * transformation_dropout[:,0:1] #(M,3), sampling from (-R_range, R_range) 
         
+        # getting mirror factors(all -1) 
+        # Note that mirror factors doesn't need any addition to be larger than any value (b/c it only has factor of -1)
+        mirror = np.repeat(-1.0, M * 3).reshape(M,3) * transformation_dropout[:,1:2]
+        mirror = mirror*transformation_axis
+        
         scale = np.random.uniform(*self.S_range, size=(M,3)) * transformation_dropout[:,1:2] #(M,3), sampling from (1, S_range)
         scale = scale*transformation_axis
         scale = scale + 1*(scale==0) #Scaling factor must be larger than 1
         
         trl = np.random.uniform(*self.T_range, size=(M,3)) * transformation_dropout[:,2:3] #(M,3), sampling from (1, T_range)
         trl = trl*transformation_axis
-        
+       
+        #Mirror Matrix ( should match the shpae of S and R in order to to do tensor muliplication later
+        Mr = np.expand_dims(mirror, axis=1)*np.eye(3) # scailing factor to diagonal Matrix(M,3) -> (M,3,3)
+
         #Scaling Matrix
         S = np.expand_dims(scale, axis=1)*np.eye(3) # scailing factor to diagonal matrix (M,3) -> (M,3,3)
         #Rotation Matrix
@@ -149,7 +157,8 @@ class PointWOLF(object):
              sz*cy, sz*sy*sx + cz*cy, sz*sy*cx - cz*sx,
              -sy, cy*sx, cy*cx], axis=1).reshape(M,3,3)
         
-        pos_normalize = pos_normalize@R@S + trl.reshape(M,1,3)
+        #tensor(generalized matrix) multiplication( all the shape other than the last two dimensions should be identical
+        pos_normalize = pos_normalize@Mr@R@S + trl.reshape(M,1,3)
         return pos_normalize
     
     def get_random_axis(self, n_axis):
@@ -162,6 +171,9 @@ class PointWOLF(object):
         """
         axis = np.random.randint(1,8, (n_axis)) # 1(001):z, 2(010):y, 3(011):yz, 4(100):x, 5(101):xz, 6(110):xy, 7(111):xyz    
         m = 3 
+        
+        # [:,None] : creates an axis with length 1 ex) (4,) -> (4,1) / [1,2,3,4] -> [[1],[2],[3],[4]]
+        # astype(type) : casts specified to 'type'
         axis = (((axis[:,None] & (1 << np.arange(m)))) > 0).astype(int)
         return axis
     
