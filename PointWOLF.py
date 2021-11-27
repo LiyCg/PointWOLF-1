@@ -43,21 +43,25 @@ class PointWOLF(object):
         # actual anchor points
         pos_anchor = pos[idx] #(M,3), anchor point
         
-        # expand anchor points' dimension to the number of data points
+        # expand data points' dimension to the number of anchor points
         pos_repeat = np.expand_dims(pos,0).repeat(M, axis=0)#(M,N,3)
         
         # initializing pos_normalize
         pos_normalize = np.zeros_like(pos_repeat, dtype=pos.dtype)  #(M,N,3)
         
         #Move to canonical space
+        # center pointed at (0,0,0) and length(width&height) 2 cube space
+        # when one shape dimension is '-1', the value is inferred from the length of the array and remaining dimensions
+        # pos_normalize = literally the set of vectors pointing to the pointcolud data points from each of the M number of anchor points
         pos_normalize = pos_repeat - pos_anchor.reshape(M,-1,3)
         
         #Local transformation at anchor point
         pos_transformed = self.local_transformaton(pos_normalize) #(M,N,3)
         
-        #Move to origin space
+        #Move to origin space(from canonical space)
         pos_transformed = pos_transformed + pos_anchor.reshape(M,-1,3) #(M,N,3)
         
+        # go through kernel_regression for smooth deformation 
         pos_new = self.kernel_regression(pos, pos_anchor, pos_transformed)
         pos_new = self.normalize(pos_new)
         
@@ -132,12 +136,15 @@ class PointWOLF(object):
         degree = np.pi * np.random.uniform(*self.R_range, size=(M,3)) / 180.0 * transformation_dropout[:,0:1] #(M,3), sampling from (-R_range, R_range) 
         
         # getting mirror factors(all -1) 
-        # Note that mirror factors doesn't need any addition to be larger than any value (b/c it only has factor of -1)
+        # Note that there's no need for addition (b/c it only has factor of -1)
         mirror = np.repeat(-1.0, M * 3).reshape(M,3) * transformation_dropout[:,1:2]
         mirror = mirror*transformation_axis
         
+        # deriving scale factors from uniform distribution( multiplied by dropout parameter)
         scale = np.random.uniform(*self.S_range, size=(M,3)) * transformation_dropout[:,1:2] #(M,3), sampling from (1, S_range)
+        # to which axis the scale factor will be applied is determined here
         scale = scale*transformation_axis
+        # scale value must be bigger than 1 
         scale = scale + 1*(scale==0) #Scaling factor must be larger than 1
         
         trl = np.random.uniform(*self.T_range, size=(M,3)) * transformation_dropout[:,2:3] #(M,3), sampling from (1, T_range)
